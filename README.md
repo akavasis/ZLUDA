@@ -1,6 +1,9 @@
+__Notice__: Due to private reasons I am currently unable to continue developing this project. If you
+want to take it over, fork it and contact me at vosen@vosen.pl
+
 # ZLUDA
 
-ZLUDA is a drop-in replacament for CUDA on Intel GPU. ZLUDA allows to run unmodified CUDA applications using Intel GPUs with near-native performance (more below). It works with current integrated Intel UHD GPUs and will work with future Intel Xe GPUs
+ZLUDA is a drop-in replacement for CUDA on Intel GPU. ZLUDA allows to run unmodified CUDA applications using Intel GPUs with near-native performance (more below). It works with current integrated Intel UHD GPUs and will work with future Intel Xe GPUs
 
 ## Performance
 
@@ -11,35 +14,34 @@ Performance below is normalized to OpenCL performance. 110% means that ZLUDA-imp
 
 ![Performance graph](GeekBench_5_2_3.svg)
 
-[ZLUDA detailed log on Geekbench.com](https://browser.geekbench.com/v5/compute/1918048)
+[ZLUDA - detailed results on Geekbench.com](https://browser.geekbench.com/v5/compute/2305009)
 
-[OpenCL detailed log on Geekbench.com](https://browser.geekbench.com/v5/compute/1918080)
+[OpenCL - detailed results on Geekbench.com](https://browser.geekbench.com/v5/compute/2304997)
 
-Overall in this suite of benchmarks faster by approximately 4% on ZLUDA.
+Overall, ZLUDA is slower in GeekBench by roughly 2%.
 
 ### Explanation of the results
- * Why is ZLUDA faster in Stereo Matching, Gaussian Blur and Depth of Field?\
+ * Why is ZLUDA faster in some benchmarks?\
    This has not been precisely pinpointed to one thing or another but it's likely a combination of things:
-   * ZLUDA uses Level 0, which in general is a more level, highr performance API
+   * ZLUDA uses [Level 0](https://spec.oneapi.com/level-zero/latest/index.html), which in general is a more low level, high performance API than OpenCL
    * Tying to the previous point, currently ZLUDA does not support asynchronous execution. This gives us an unfair advantage in a benchmark like GeekBench. GeekBench exclusively uses CUDA synchronous APIs
    * There is a set of GPU instructions which are available on both NVIDIA hardware and Intel hardware, but are not exposed through OpenCL. We are comparing NVIDIA GPU optimized code with the more general OpenCL code. It's a lucky coincidence (and a credit to the underlying Intel Graphics Compiler) that this code also works well on an Intel GPU
  * Why is OpenCL faster in Canny and Horizon Detection?\
    Authors of CUDA benchmarks used CUDA functions `atomicInc` and `atomicDec` which have direct hardware support on NVIDIA cards, but no hardware support on Intel cards. They have to be emulated in software, which limits performance
- * Why are some benchmarks failing?\
-   ZLUDA itself supports all the operations used in the failing benchmarks. From the limited debugging that has been done so far, the problem is most likely somewhere else. Intel GPU compiler stack is very capable when it comes to compiling OpenCL, C for Metal and DPC++. It's not yet very good at compiling ZLUDA. ZLUDA emits code patterns never seen before by the Intel GPU compiler stack and hits some rarely used (or not used before) code paths in the compiler.\
-   Current status of failing GeekBench tests is tracked [here](https://github.com/vosen/ZLUDA/pull/12)
+ * Why is ZLUDA slower in the remaining benchmarks?\
+   The reason is unknown. Most likely, in some tests we compile from suboptimal NVIDIA GPU code and in other tests ZLUDA itself is emitting suboptimal Intel GPU code. For example, SFFT used to be even slower before PR [#22](https://github.com/vosen/ZLUDA/pull/22)
    
 
 ## Details
 
  * Is ZLUDA a drop-in replacement for CUDA?\
-   Yes, but certain applications use CUDA in ways which make it incompatible with  ZLUDA.
- * What is the status of the project\
-   This project is a Proof of Concept. About the only thing that works currently is  Geekbench (and not even completely). It's amazingly buggy and incomplete. You  should not rely on it for anything serious
+   Yes, but certain applications use CUDA in ways which make it incompatible with  ZLUDA
+ * What is the status of the project?\
+   This project is a Proof of Concept. About the only thing that works currently is  Geekbench. It's amazingly buggy and incomplete. You  should not rely on it for anything serious
  * Is it an Intel project? Is it an NVIDIA project?\
    No, it's a private project
  * What is the performance?\
-   Performance can be clode to the performance of similarly written OpenCL code (see  GeekBench results in the previous section).  NVIDIA GPUs and Intel GPUs have  different architecture and feature set. Consequently, certain NVIDIA features have  to be emulated in ZLUDA with performance penalty. Additionally, performance of  ZLUDA will be always lower than the performance of code specifically optimized for  Intel GPUs
+   Performance can be close to the performance of similarly written OpenCL code (see  GeekBench results in the previous section).  NVIDIA GPUs and Intel GPUs have  different architecture and feature set. Consequently, certain NVIDIA features have  to be emulated in ZLUDA with performance penalty. Additionally, performance of  ZLUDA will be always lower than the performance of code specifically optimized for Intel GPUs
  * How it's different from AMD HIP or Intel DPC++ Compatibility toolkit?\
    Both are porting toolkits which require programmer's effort to port applications  to the API in question. With ZLUDA existing applications "just work" on an Intel  GPU (if you are lucky and ZLUDA supports the particular subset of CUDA)
  * Which Intel GPU are supported?\
@@ -49,26 +51,41 @@ Overall in this suite of benchmarks faster by approximately 4% on ZLUDA.
 
 
 ## Usage
-**Warning**: this is a very incomplete Proof of Concept. It's probably not going to work with your application. ZLUDA currently works only with applications which use CUDA Driver API. Linux builds also work with applications which use statically-linked CUDA Runtime API
+**Warning**: this is a very incomplete proof of concept. It's probably not going to work with your application. ZLUDA currently works only with applications which use CUDA Driver API or statically-linked CUDA Runtime API - dynamically-linked CUDA Runtime API is not supported at all
 
 ### Windows
-You should have the most recent GPU drivers installed.\
-Copy `nvcuda.dll` to the application directory (the directory where .exe file is) and launch it normally
+You should have the most recent Intel GPU drivers installed.\
+Run your application like this:
+```
+<ZLUDA_DIRECTORY>\zluda_with.exe -- <APPLICATION> <APPLICATIONS_ARGUMENTS>
+```
 
 ### Linux
-A very recent version of [compute-runtime](https://github.com/intel/compute-runtime) is required. At the time of the writing 20.45.18403 is the recommended version.
-Unpack the archive somewhere and run your application like this:
+You should install most recent run-time driver packages as outlined here: https://dgpu-docs.intel.com/installation-guides/index.html.  
+Run your application like this:
 ```
-LD_LIBRARY_PATH=<PATH_TO_THE_DIRECTORY_WITH_ZLUDA_PROVIDED_LIBCUDA> <YOUR_APPLICATION>
+LD_LIBRARY_PATH=<ZLUDA_DIRECTORY> <APPLICATION> <APPLICATIONS_ARGUMENTS>
 ```
 
 ## Building
 You should have a relatively recent version of Rust installed, then you just do:
 
 ```
-cargo build
+cargo build --release
 ```
-in the main directory of the project
+in the main directory of the project.  
+### Linux
+You should install most recent run-time an developer driver packages as outlined here: https://dgpu-docs.intel.com/installation-guides/index.html. Additionally, you should have `ocl-icd-opencl-dev` (or equivalent) installed.  
+If you are building on Linux you must also symlink (or rename) the ZLUDA output binaries after ZLUDA build finishes:
+```
+ln -s libnvcuda.so target/release/libcuda.so
+ln -s libcuda.so target/release/libcuda.so.1
+```
+
+## Contributing
+
+If you want to develop ZLUDA itself, read [CONTRIBUTING.md](CONTRIBUTING.md), it contains instructions how to set up dependencies and run tests
+
 
 ## License
 

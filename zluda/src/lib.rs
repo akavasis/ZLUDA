@@ -4,13 +4,12 @@ extern crate level_zero_sys as l0_sys;
 extern crate lazy_static;
 #[cfg(test)]
 extern crate cuda_driver_sys;
-extern crate lz4;
 #[cfg(test)]
 #[macro_use]
 extern crate paste;
 extern crate ptx;
 
 #[allow(warnings)]
-mod cuda;
+pub mod cuda;
 mod cuda_impl;
 pub(crate) mod r#impl;

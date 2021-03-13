@@ -4,8 +4,10 @@ use std::{
 };
 
 use super::{
-    device, function::Function, function::FunctionData, CUresult, GlobalState, HasLivenessCookie,
-    LiveCheck,
+    device,
+    function::Function,
+    function::{FunctionData, LegacyArguments},
+    CUresult, GlobalState, HasLivenessCookie, LiveCheck,
 };
 use ptx;
 
@@ -85,7 +87,7 @@ impl SpirvModule {
         };
         let l0_module = match self.should_link_ptx_impl {
             None => {
-                l0::Module::build_spirv(ctx, dev, byte_il, Some(self.build_options.as_c_str())).0
+                l0::Module::build_spirv(ctx, dev, byte_il, Some(self.build_options.as_c_str()))
             }
             Some(ptx_impl) => {
                 l0::Module::build_link_spirv(
@@ -145,6 +147,7 @@ pub fn get_function(
                     arg_size: kernel_info.arguments_sizes.clone(),
                     use_shared_mem: kernel_info.uses_shared_mem,
                     properties: None,
+                    legacy_args: LegacyArguments::new(),
                 })))
             }
         };
@@ -185,4 +188,18 @@ pub(crate) fn unload(module: *mut Module) -> Result<(), CUresult> {
         return Err(CUresult::CUDA_ERROR_INVALID_VALUE);
     }
     GlobalState::lock(|_| Module::destroy_impl(module))?
+}
+
+pub(crate) fn load(pmod: *mut *mut Module, fname: *const i8) -> Result<(), CUresult> {
+    if pmod == ptr::null_mut() || fname == ptr::null() {
+        return Err(CUresult::CUDA_ERROR_INVALID_VALUE);
+    }
+    let path = unsafe { CStr::from_ptr(fname) };
+    let path_utf8 = path
+        .to_str()
+        .map_err(|_| CUresult::CUDA_ERROR_INVALID_VALUE)?;
+    let file = std::fs::read(path_utf8).map_err(|_| CUresult::CUDA_ERROR_FILE_NOT_FOUND)?;
+    let module_text = std::str::from_utf8(&file).map_err(|_| CUresult::CUDA_ERROR_INVALID_PTX)?;
+    let spirv_data = SpirvModule::new(module_text)?;
+    load_data_impl(pmod, spirv_data)
 }

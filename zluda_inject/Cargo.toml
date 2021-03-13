@@ -5,12 +5,9 @@ authors = ["Andrzej Janik <vosen@vosen.pl>"]
 edition = "2018"
 
 [[bin]]
-name = "zluda"
+name = "zluda_with"
 path = "src/main.rs"
 
 [target.'cfg(windows)'.dependencies]
-zluda_redirect = { path = "../zluda_redirect" }
-winapi = { version = "0.3", features = ["processthreadsapi", "std", "synchapi"] }
-detours-sys = "0.1"
-clap = "2.33"
-guid = "0.1"
+winapi = { version = "0.3", features = ["jobapi2", "processthreadsapi", "synchapi", "winbase", "std"] }
+detours-sys = { path = "../detours-sys" }
